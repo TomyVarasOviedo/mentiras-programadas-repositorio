@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head><title>Chat WebSocket</title></head>
+  <body>
+    <h3>Chat con SmolLM3 (via WebSocket)</h3>
+    <textarea id="log" cols="80" rows="20"></textarea><br/>
+    <input id="msg" size="80"/><button onclick="send()">Enviar</button>
+    <script>
+      const ws = new WebSocket("ws://" + location.host + "/ws");
+      const log = document.getElementById("log");
+      ws.onmessage = (e) => { log.value += "\\n" + e.data; };
+      function send() {
+        const m = document.getElementById("msg").value;
+        ws.send(m);
+      }
+    </script>
+  </body>
+</html>

@@ -2,64 +2,48 @@ import os
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-from llama_cpp import Llama
+from transformers import pipeline
+from transformers import AutoTokenier
 
-MODEL_PATH = os.environ.get(
-    "MODEL_PATH", "/models/SmolLM3-3B-GGUF/SmolLM3-3B-GGUF.gguf"
-)
+model_id = "HuggingFaceTB/SmolLM3-3B"
 
-# Inicializar modelo (carga al iniciar la app)
-# Ajusta los kwargs de Llama() según tu hardware (n_gpu_layers, n_ctx, etc.)
-llm = Llama(model_path=MODEL_PATH)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+pipe = pipeline("text-generation", model=model_id, tokenizer=tokenizer)
+
+SYSTEM_PROMPT = """[INSTRUCCIONES]\nFrom now on, you will speak Spanish at all times."""
+
 
 app = FastAPI()
-
-html = """
-<!DOCTYPE html>
-<html>
-  <head><title>Chat WebSocket</title></head>
-  <body>
-    <h3>Chat con SmolLM3 (via WebSocket)</h3>
-    <textarea id="log" cols="80" rows="20"></textarea><br/>
-    <input id="msg" size="80"/><button onclick="send()">Enviar</button>
-    <script>
-      const ws = new WebSocket("ws://" + location.host + "/ws");
-      const log = document.getElementById("log");
-      ws.onmessage = (e) => { log.value += "\\n" + e.data; };
-      function send() {
-        const m = document.getElementById("msg").value;
-        ws.send(m);
-      }
-    </script>
-  </body>
-</html>
-"""
 
 
 @app.get("/")
 async def get():
-    return HTMLResponse(html)
+    file = open("index.html")
+    html_content = file.read()
+    file.close()
+    return HTMLResponse(html_content)
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    message = [{"role": "system", "content": "/no_think"}]
     try:
         while True:
             text = await websocket.receive_text()
             # Simple prompt assembly: se podría mejorar guardando historial, etc.
             prompt = text
 
-            # Llame a la API de llama-cpp-python.
-            # Dependiendo de la versión de llama-cpp-python la llamada puede ser:
-            #   response = llm(prompt, max_tokens=256)                    # forma simple
-            #   response = llm.create_completion(prompt=prompt, max_tokens=256)  # otra forma
-            #
-            # A continuación usamos la interfaz simple (ajusta si tu versión es distinta).
-            response = llm(prompt, max_tokens=256, do_sample=False)
+            Personaje = ""
+            message.append(
+                {
+                    "role": "user",
+                    "content": f"\n{SYSTEM_PROMPT}\n{prompt}\n{Personaje} ",
+                }
+            )
+            response = pipe(message)
 
-            # 'response' suele ser un dict; aquí tomamos la primera salida textual.
-            # Ajusta según la estructura real devuelta por tu versión.
             text_out = None
             if isinstance(response, dict):
                 # formatos comunes: {'choices': [{'text': '...'}], ...} o {'choices': [{'message': {'content': '...'}}]}
